@@ -242,16 +242,18 @@ export default function App() {
         {/* ── Error ───────────────────────────────────────── */}
         {status === "error" && (
           <div className="anim-pop" style={{ ...card, padding:"2rem", textAlign:"center" }}>
-            <div style={{ width:60, height:60, borderRadius:18, background:"#FCEBEB", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
-              <span style={{ fontSize:28 }}>📡</span>
+            <div style={{ width:64, height:64, borderRadius:20, background:"#FCEBEB", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:32 }}>
+              📡
             </div>
-            <p style={{ fontWeight:600, fontSize:16, marginBottom:8 }}>Can't reach backend</p>
-            <p style={{ fontSize:13, color:text2, marginBottom:8, lineHeight:1.6 }}>
-              Render free tier sleeps after 15 mins.<br/>First load takes <strong>30–60 seconds</strong> to wake up.
+            <p style={{ fontWeight:600, fontSize:16, marginBottom:8, color:text }}>Can't reach backend</p>
+            <p style={{ fontSize:13, color:text2, marginBottom:4, lineHeight:1.7 }}>
+              Render free tier sleeps after 15 mins.<br/>
+              First load takes <strong style={{ color:text }}>30–60 seconds</strong> to wake up.
             </p>
-            <button className="btn-hover" onClick={()=>{ setStatus("loading"); loadData(); }}
-              style={{ background:accent, color:"#fff", border:"none", borderRadius:22, padding:"11px 28px", cursor:"pointer", fontSize:14, marginTop:8, display:"inline-flex", alignItems:"center", gap:8 }}>
-              <i className="ti ti-refresh" style={{ fontSize:16 }} /> Try Again
+            <p style={{ fontSize:12, color:text3, marginBottom:20 }}>Just tap Try Again and wait a moment ☕</p>
+            <button onClick={()=>{ setStatus("loading"); loadData(); }}
+              style={{ background:accent, color:"#fff", border:"none", borderRadius:24, padding:"12px 32px", cursor:"pointer", fontSize:14, display:"inline-flex", alignItems:"center", gap:8, fontWeight:500, boxShadow:`0 4px 14px ${accent}44` }}>
+              🔄 Try Again
             </button>
           </div>
         )}

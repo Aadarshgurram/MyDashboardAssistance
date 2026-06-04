@@ -1,0 +1,106 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+#root { min-height: 100vh; min-height: 100dvh; }
+button { font-family: inherit; }
+a { text-decoration: none; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.25); border-radius: 4px; }
+
+@keyframes spin    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes fadeIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeUp  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.35} }
+@keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+@keyframes popIn   { 0%{transform:scale(0.92);opacity:0} 100%{transform:scale(1);opacity:1} }
+@keyframes slideTab{ from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+
+.anim-fade   { animation: fadeIn 0.25s ease both; }
+.anim-fadeup { animation: fadeUp 0.3s ease both; }
+.anim-pop    { animation: popIn 0.2s cubic-bezier(0.34,1.56,0.64,1) both; }
+.anim-tab    { animation: slideTab 0.2s ease both; }
+.spin        { animation: spin 0.75s linear infinite; }
+.pulse-anim  { animation: pulse 1.6s ease-in-out infinite; }
+
+/* Stagger delays */
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 180ms; }
+.stagger > *:nth-child(5) { animation-delay: 240ms; }
+.stagger > *:nth-child(6) { animation-delay: 300ms; }
+
+.drow { transition: background 0.15s ease; cursor: default; }
+.brow { transition: border-color 0.18s ease, box-shadow 0.18s ease; }
+.brow:hover { box-shadow: 0 2px 16px rgba(0,0,0,0.1); }
+
+.btn-hover { transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease; }
+.btn-hover:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.btn-hover:active:not(:disabled) { transform: translateY(0); }
+
+.tabs-scroll { scrollbar-width: none; }
+.tabs-scroll::-webkit-scrollbar { display: none; }
+
+.score-fill { transition: width 0.75s cubic-bezier(0.4,0,0.2,1); }
+
+.tag-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase;
+}
+
+.card-glow { transition: box-shadow 0.2s ease; }
+.card-glow:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
+
+/* Bottom nav mobile */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: none; z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 0.5px solid rgba(128,128,128,0.15);
+}
+.bottom-nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; padding: 8px 4px 6px;
+  border: none; background: transparent; cursor: pointer;
+  transition: transform 0.15s ease;
+  font-size: 10px; font-family: inherit;
+}
+.bottom-nav-btn:active { transform: scale(0.9); }
+.bottom-nav-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+@media (max-width: 600px) {
+  .bottom-nav       { display: flex; }
+  .desktop-tabs     { display: none !important; }
+  .main-pad         { padding: 1rem 0.875rem 5.5rem; }
+  .header-btn-text  { display: none; }
+  .weather-week     { gap: 3px !important; }
+  .weather-week > div { min-width: 28px !important; padding: 4px !important; }
+  .stat-grid        { gap: 8px !important; }
+  .stat-value       { font-size: 22px !important; }
+  .hero-title       { font-size: 18px !important; }
+}
+
+@media (min-width: 601px) {
+  .bottom-nav { display: none; }
+  .main-pad   { padding: 1.5rem; max-width: 740px; margin: 0 auto; }
+}
+
+/* Glassmorphism card */
+.glass {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

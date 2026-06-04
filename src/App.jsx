@@ -1,349 +1,497 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+const API = "http://localhost:3001";
 
 const today = new Date();
-const dayName = today.toLocaleDateString("en-IN", { weekday: "long" });
-const dateStr = today.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-const timeStr = today.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+const dayName  = today.toLocaleDateString("en-IN", { weekday: "long" });
+const dateStr  = today.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+const greeting = today.getHours() < 12 ? "Good morning" : today.getHours() < 17 ? "Good afternoon" : "Good evening";
 
 const weather = {
-  location: "Hyderabad, TG",
-  temp: 94,
-  condition: "Partly Sunny",
-  icon: "ti-cloud-sun",
+  temp: 94, condition: "Partly Sunny", icon: "ti-cloud-sun",
   week: [
-    { day: "Wed", high: 96, rain: 15, icon: "ti-cloud-sun" },
-    { day: "Thu", high: 96, rain: 50, icon: "ti-cloud-rain" },
-    { day: "Fri", high: 94, rain: 65, icon: "ti-cloud-rain" },
-    { day: "Sat", high: 94, rain: 35, icon: "ti-cloud-drizzle" },
-    { day: "Sun", high: 94, rain: 35, icon: "ti-cloud-drizzle" },
-  ]
-};
-
-const emails = [
-  { from: "Google Security", color: "#E24B4A", dbg: "#501313", bg: "#FCEBEB", subject: "Security alert", note: "Claude for Gmail & Calendar access granted — confirm it was you", tag: "alert", time: "9:14 AM", priority: 1 },
-  { from: "Kaggle", color: "#0F6E56", bg: "#E1F5EE", dbg: "#04342C", subject: "5-Day AI Agents Course", note: "Reminder: Intensive Vibe Coding Course with Google, June 15–19", tag: "action", time: "Jun 2", priority: 2 },
-  { from: "LinkedIn", color: "#185FA5", bg: "#E6F1FB", dbg: "#042C53", subject: "10+ new invitations", note: "Multiple connection requests waiting for your response", tag: "action", time: "Jun 2", priority: 2 },
-  { from: "Google Cloud", color: "#185FA5", bg: "#E6F1FB", dbg: "#042C53", subject: "AI agents in 2026", note: "5 trends defining AI agents — insights from 3,466 executives", tag: "read", time: "8:10 AM", priority: 3 },
-  { from: "Medium", color: "#2C2C2A", bg: "#F1EFE8", dbg: "#2C2C2A", subject: "AI Agents: Complete Course", note: "Daily digest — Marina Wyss in Data Science Collective", tag: "read", time: "Jun 2", priority: 3 },
-  { from: "Internshala", color: "#854F0B", bg: "#FAEEDA", dbg: "#412402", subject: "Top Web Dev internships", note: "New openings matching your profile in your area", tag: "read", time: "Jun 2", priority: 3 },
-];
-
-const slackMessages = [
-  { channel: "#general", from: "Lizzie", color: "#534AB7", bg: "#EEEDFE", dbg: "#26215C", text: "Joined the channel", time: "Jun 2, 3:10 PM", priority: 3 }
-];
-
-const priorityItems = [
-  { score: 99, label: "Critical", color: "#E24B4A", bg: "#FCEBEB", dbg: "#501313", dc: "#F09595", icon: "ti-shield-exclamation", source: "Gmail", title: "Security alert from Google", desc: "Confirm Claude's access to your Gmail & Calendar was authorised by you." },
-  { score: 82, label: "High", color: "#D85A30", bg: "#FAECE7", dbg: "#4A1B0C", dc: "#F0997B", icon: "ti-brand-slack", source: "Slack", title: "Channel activity in #general", desc: "Lizzie joined #general — good time to say hello or share a quick update." },
-  { score: 74, label: "High", color: "#D85A30", bg: "#FAECE7", dbg: "#4A1B0C", dc: "#F0997B", icon: "ti-users", source: "Gmail · LinkedIn", title: "10+ pending connection requests", desc: "Review and respond to LinkedIn invitations — network while intent is fresh." },
-  { score: 61, label: "Medium", color: "#854F0B", bg: "#FAEEDA", dbg: "#412402", dc: "#FAC775", icon: "ti-school", source: "Gmail · Kaggle", title: "AI Agents course starting June 15", desc: "Register for the Kaggle intensive course with Google before spots fill up." },
-  { score: 38, label: "Low", color: "#3B6D11", bg: "#EAF3DE", dbg: "#173404", dc: "#97C459", icon: "ti-calendar-off", source: "Calendar", title: "Calendar is clear this week", desc: "No meetings scheduled — ideal for deep work, planning, or personal goals." },
-];
-
-const weeklySummary = {
-  totalEmails: 10,
-  unread: 10,
-  actionNeeded: 2,
-  meetings: 0,
-  slackMessages: 1,
-  highlights: [
-    { icon: "ti-shield-exclamation", color: "#E24B4A", text: "1 security alert requiring your confirmation" },
-    { icon: "ti-school", color: "#0F6E56", text: "AI Agents course with Google starts June 15 — registration open" },
-    { icon: "ti-users", color: "#185FA5", text: "10+ LinkedIn connection requests pending a response" },
-    { icon: "ti-calendar", color: "#378ADD", text: "Week is completely free — zero meetings scheduled" },
-    { icon: "ti-brand-slack", color: "#534AB7", text: "Slack quiet — 1 message in #general, no DMs" },
+    { day: "Wed", high: 96, rain: 15, icon: "ti-cloud-sun"    },
+    { day: "Thu", high: 96, rain: 50, icon: "ti-cloud-rain"   },
+    { day: "Fri", high: 94, rain: 65, icon: "ti-cloud-rain"   },
+    { day: "Sat", high: 94, rain: 35, icon: "ti-cloud-drizzle"},
+    { day: "Sun", high: 94, rain: 35, icon: "ti-cloud-drizzle"},
   ]
 };
 
 const tagMeta = {
-  alert: { bg: "#FCEBEB", color: "#A32D2D", dbg: "#501313", dc: "#F09595" },
-  action: { bg: "#FAEEDA", color: "#854F0B", dbg: "#412402", dc: "#FAC775" },
-  read: { bg: "#EAF3DE", color: "#3B6D11", dbg: "#173404", dc: "#97C459" },
+  alert:  { bg:"#FCEBEB", color:"#A32D2D", dbg:"#501313", dc:"#F09595", icon:"ti-alert-circle"     },
+  action: { bg:"#FAEEDA", color:"#854F0B", dbg:"#412402", dc:"#FAC775", icon:"ti-circle-arrow-right"},
+  read:   { bg:"#EAF3DE", color:"#3B6D11", dbg:"#173404", dc:"#97C459", icon:"ti-eye"               },
 };
 
-const tabs = [
-  { id: "briefing", label: "Briefing", icon: "ti-sparkles" },
-  { id: "priority", label: "Priority", icon: "ti-star" },
-  { id: "weekly", label: "Weekly", icon: "ti-chart-bar" },
-  { id: "calendar", label: "Calendar", icon: "ti-calendar" },
-  { id: "email", label: "Gmail", icon: "ti-mail" },
-  { id: "slack", label: "Slack", icon: "ti-brand-slack" },
+const ALL_TABS = [
+  { id:"briefing", label:"Briefing",  icon:"ti-sparkles"    },
+  { id:"priority", label:"Priority",  icon:"ti-star"        },
+  { id:"weekly",   label:"Weekly",    icon:"ti-chart-bar"   },
+  { id:"calendar", label:"Calendar",  icon:"ti-calendar"    },
+  { id:"email",    label:"Gmail",     icon:"ti-mail"        },
+  { id:"slack",    label:"Slack",     icon:"ti-brand-slack" },
 ];
 
-const briefingPoints = [
-  { icon: "ti-shield-exclamation", color: "#E24B4A", text: "Review the Google security alert about Claude's Gmail & Calendar access — confirm it was you." },
-  { icon: "ti-users", color: "#185FA5", text: "You have 10+ pending LinkedIn invitations — worth a quick review." },
-  { icon: "ti-school", color: "#0F6E56", text: "Kaggle reminder: AI Agents Intensive Course with Google starts June 15 — register if interested." },
-  { icon: "ti-brand-slack", color: "#639922", text: "Slack is quiet — only a channel join in #general, no urgent messages." },
-  { icon: "ti-calendar-off", color: "#378ADD", text: "Calendar is completely clear this week — great time for focused work." },
-];
+// Only 4 tabs shown in mobile bottom nav
+const BOTTOM_TABS = ["briefing","email","calendar","slack"];
+
+function getPriorityItems(emails, slack) {
+  const items = [];
+  const alerts  = emails.filter(e => e.tag === "alert");
+  const actions = emails.filter(e => e.tag === "action");
+  if (alerts.length)  items.push({ score:99, label:"Critical", color:"#E24B4A", bg:"#FCEBEB", dbg:"#501313", dc:"#F09595", icon:"ti-shield-exclamation", source:"Gmail",   title:`${alerts.length} critical alert${alerts.length>1?"s":""}`,        desc: alerts.map(e=>e.subject).slice(0,2).join(" · ") });
+  if (actions.length) items.push({ score:78, label:"High",     color:"#D85A30", bg:"#FAECE7", dbg:"#4A1B0C", dc:"#F0997B", icon:"ti-mail",              source:"Gmail",   title:`${actions.length} emails need your action`,                        desc: actions.map(e=>e.subject).slice(0,2).join(" · ") });
+  if (slack.length)   items.push({ score:60, label:"Medium",   color:"#854F0B", bg:"#FAEEDA", dbg:"#412402", dc:"#FAC775", icon:"ti-brand-slack",       source:"Slack",   title:`${slack.length} Slack message${slack.length>1?"s":""}`,             desc: slack.slice(0,2).map(m=>`${m.from} in ${m.channel}`).join(" · ") });
+  items.push(                     { score:30, label:"Low",      color:"#3B6D11", bg:"#EAF3DE", dbg:"#173404", dc:"#97C459", icon:"ti-calendar",          source:"Calendar",title:"Review your week ahead",                                          desc:"Check calendar for upcoming deadlines or meetings." });
+  return items;
+}
+
+function getBriefing(emails, events, slack) {
+  const pts = [];
+  const alerts  = emails.filter(e => e.tag === "alert");
+  const actions = emails.filter(e => e.tag === "action");
+  if (alerts.length)  pts.push({ icon:"ti-shield-exclamation", color:"#E24B4A", text:`🚨 ${alerts.length} security alert${alerts.length>1?"s":""}: ${alerts[0]?.subject}. Review immediately.` });
+  if (actions.length) pts.push({ icon:"ti-mail",               color:"#D85A30", text:`📬 ${actions.length} emails need action — ${actions.slice(0,2).map(e=>e.subject).join(", ")}.` });
+  if (events.length)  pts.push({ icon:"ti-calendar",           color:"#378ADD", text:`📅 ${events.length} event${events.length>1?"s":""} this week — next: ${events[0]?.title} on ${events[0]?.start}.` });
+  else                pts.push({ icon:"ti-calendar-off",       color:"#378ADD", text:"📅 Calendar is clear this week — great time for deep work." });
+  if (slack.length)   pts.push({ icon:"ti-brand-slack",        color:"#534AB7", text:`💬 ${slack.length} Slack message${slack.length>1?"s":""}  — latest from ${slack[0]?.from} in ${slack[0]?.channel}.` });
+  else                pts.push({ icon:"ti-brand-slack",        color:"#639922", text:"💬 Slack is quiet — no unread messages or mentions." });
+  return pts;
+}
 
 const ScoreBar = ({ score, color, dark }) => (
-  <div style={{ height: 4, borderRadius: 4, background: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)", overflow: "hidden", width: "100%" }}>
-    <div style={{ width: `${score}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.6s ease" }} />
+  <div style={{ height:5, borderRadius:5, background: dark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.07)", overflow:"hidden", flex:1 }}>
+    <div className="score-fill" style={{ width:`${score}%`, height:"100%", background:`linear-gradient(90deg,${color}99,${color})`, borderRadius:5 }} />
   </div>
 );
 
-export default function Dashboard() {
-  const [tab, setTab] = useState("briefing");
-  const [dark, setDark] = useState(false);
+const IconCircle = ({ icon, color, bg, size=36 }) => (
+  <div style={{ width:size, height:size, borderRadius:"50%", background:bg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+    <i className={`ti ${icon}`} style={{ fontSize:size*0.42, color }} aria-hidden="true" />
+  </div>
+);
+
+const IconSquare = ({ icon, color, bg, size=30, radius=8 }) => (
+  <div style={{ width:size, height:size, borderRadius:radius, background:bg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+    <i className={`ti ${icon}`} style={{ fontSize:size*0.46, color }} aria-hidden="true" />
+  </div>
+);
+
+const SkeletonBlock = ({ w="100%", h=52 }) => (
+  <div className="pulse-anim" style={{ width:w, height:h, borderRadius:10, background:"rgba(128,128,128,0.12)" }} />
+);
+
+export default function App() {
+  const [tab,        setTab]        = useState("briefing");
+  const [dark,       setDark]       = useState(true);
+  const [status,     setStatus]     = useState("loading");
+  const [data,       setData]       = useState({ emails:[], events:[], slack:[], lastUpdated:null });
   const [refreshing, setRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState(timeStr);
+  const [authUrl,    setAuthUrl]    = useState("");
 
-  const d = dark;
-  const bg = d ? "#1a1a1a" : "#ffffff";
-  const bg2 = d ? "#252525" : "#f5f4f0";
-  const bg3 = d ? "#2e2e2e" : "#eeedea";
-  const text = d ? "#e8e6e0" : "#1a1a1a";
-  const text2 = d ? "#9a9890" : "#666560";
-  const text3 = d ? "#5a5856" : "#aaa9a5";
-  const border = d ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)";
-  const border2 = d ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.18)";
+  // ── Theme tokens ──────────────────────────────────────────
+  const d      = dark;
+  const bg     = d ? "#161618"  : "#f7f7f5";
+  const bgCard = d ? "#1e1e21"  : "#ffffff";
+  const bg2    = d ? "#252528"  : "#f0efec";
+  const bg3    = d ? "#2a2a2e"  : "#e8e7e3";
+  const text   = d ? "#e8e6df"  : "#18181a";
+  const text2  = d ? "#8a8884"  : "#64635e";
+  const text3  = d ? "#525250"  : "#a8a7a2";
+  const border = d ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)";
+  const accent = d ? "#5b9bd5"  : "#185FA5";
 
-  const handleRefresh = () => {
+  const card = { background:bgCard, border:`1px solid ${border}`, borderRadius:14, overflow:"hidden" };
+
+  // ── Data fetching ─────────────────────────────────────────
+  const loadData = useCallback(async (force=false) => {
+    try {
+      const res  = await fetch(`${API}/api/dashboard${force?"?force=true":""}`);
+      if (res.status === 401) {
+        const json = await res.json();
+        setAuthUrl(json.authUrl || `${API}/auth/google`);
+        setStatus("auth_needed");
+        return;
+      }
+      const json = await res.json();
+      if (json.success) { setData(json.data); setStatus("ready"); }
+      else setStatus("error");
+    } catch { setStatus("error"); }
+  }, []);
+
+  const handleRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
-    setTimeout(() => { setRefreshing(false); setLastRefresh(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })); }, 1800);
+    try {
+      const res  = await fetch(`${API}/api/refresh`, { method:"POST" });
+      const json = await res.json();
+      if (json.success) { setData(json.data); setStatus("ready"); }
+    } catch { setStatus("error"); }
+    finally { setRefreshing(false); }
   };
 
-  const card = { background: bg, border: `0.5px solid ${border}`, borderRadius: 12, overflow: "hidden" };
+  useEffect(() => { loadData(); }, [loadData]);
 
+  const { emails, events, slack } = data;
+  const briefingPoints = getBriefing(emails, events, slack);
+  const priorityItems  = getPriorityItems(emails, slack);
+  const lastFetch      = data.lastUpdated
+    ? new Date(data.lastUpdated).toLocaleTimeString("en-IN",{ hour:"2-digit", minute:"2-digit" })
+    : "--:--";
+
+  // ── Render ────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: "var(--font-sans)", padding: "1.25rem", background: bg, minHeight: "100vh", color: text, borderRadius: 16, transition: "background 0.25s" }}>
-      <style>{`
-        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-        .drow:hover{background:${bg3}!important}
-        .brow:hover{border-color:${border2}!important}
-      `}</style>
+    <div style={{ background:bg, minHeight:"100vh", minHeight:"100dvh", color:text, transition:"background 0.3s,color 0.3s" }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 500, margin: 0, color: text }}>Good morning, Aadarsh 👋</h1>
-          <p style={{ fontSize: 13, color: text2, margin: "4px 0 0" }}>{dayName}, {dateStr}</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => setDark(!d)} style={{ background: bg2, border: `0.5px solid ${border}`, borderRadius: 20, padding: "5px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, color: text2, fontSize: 13 }}>
-            <i className={`ti ${d ? "ti-sun" : "ti-moon"}`} style={{ fontSize: 14 }} aria-hidden="true" />{d ? "Light" : "Dark"}
-          </button>
-          <button onClick={handleRefresh} disabled={refreshing} style={{ background: d ? "#185FA5" : "#185FA5", border: "none", borderRadius: 20, padding: "5px 13px", cursor: refreshing ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, color: "#fff", fontSize: 13, opacity: refreshing ? 0.7 : 1 }}>
-            <i className="ti ti-refresh" style={{ fontSize: 14, animation: refreshing ? "spin 0.8s linear infinite" : "none" }} aria-hidden="true" />
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      </div>
+      <div className="main-pad">
 
-      {/* ── Weather Widget ── */}
-      <div style={{ background: d ? "#0c2d4a" : "#E6F1FB", border: `0.5px solid ${d ? "#1a5580" : "#b5d4f4"}`, borderRadius: 12, padding: "14px 16px", marginBottom: "1.25rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        {/* ── Header ─────────────────────────────────────── */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"1.25rem" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-              <i className="ti ti-map-pin" style={{ fontSize: 13, color: d ? "#6fa8dc" : "#185FA5" }} aria-hidden="true" />
-              <span style={{ fontSize: 12, color: d ? "#6fa8dc" : "#185FA5", fontWeight: 500 }}>{weather.location}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <i className={`ti ${weather.icon}`} style={{ fontSize: 32, color: d ? "#6fa8dc" : "#185FA5" }} aria-hidden="true" />
-              <div>
-                <p style={{ fontSize: 28, fontWeight: 500, margin: 0, color: d ? "#e8e6e0" : "#042C53" }}>{weather.temp}°F</p>
-                <p style={{ fontSize: 12, color: d ? "#6fa8dc" : "#185FA5", margin: 0 }}>{weather.condition}</p>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {weather.week.map((w, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: d ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.55)", borderRadius: 8, padding: "6px 8px", minWidth: 40 }}>
-                <span style={{ fontSize: 10, color: text2, fontWeight: 500 }}>{w.day}</span>
-                <i className={`ti ${w.icon}`} style={{ fontSize: 14, color: d ? "#6fa8dc" : "#185FA5" }} aria-hidden="true" />
-                <span style={{ fontSize: 11, fontWeight: 500, color: d ? "#e8e6e0" : "#042C53" }}>{w.high}°</span>
-                <span style={{ fontSize: 10, color: w.rain >= 50 ? "#E24B4A" : text3 }}>{w.rain}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <p style={{ fontSize: 11, color: d ? "#6fa8dc" : "#185FA5", margin: "8px 0 0" }}>
-          <i className="ti ti-umbrella" style={{ fontSize: 11 }} aria-hidden="true" /> Rain likely Thu–Fri (50–65%) — keep an umbrella handy
-        </p>
-      </div>
-
-      {/* ── Stat row ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: "1.25rem" }}>
-        {[
-          { icon: "ti-calendar", label: "Events this week", value: "0", accent: "#378ADD", abg: d ? "#042C53" : "#E6F1FB" },
-          { icon: "ti-mail", label: "Unread emails", value: "10+", accent: "#D85A30", abg: d ? "#4A1B0C" : "#FAECE7" },
-          { icon: "ti-brand-slack", label: "Slack messages", value: "1", accent: "#3B6D11", abg: d ? "#173404" : "#EAF3DE" },
-        ].map(({ icon, label, value, accent, abg }) => (
-          <div key={label} style={{ background: bg2, borderRadius: 10, padding: "14px 16px", border: `0.5px solid ${border}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: abg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <i className={`ti ${icon}`} style={{ fontSize: 15, color: accent }} aria-hidden="true" />
-              </div>
-              <span style={{ fontSize: 12, color: text2 }}>{label}</span>
-            </div>
-            <p style={{ fontSize: 26, fontWeight: 500, margin: 0, color: text }}>{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Tabs ── */}
-      <div style={{ borderBottom: `0.5px solid ${border}`, marginBottom: "1.25rem", display: "flex", gap: 0, overflowX: "auto" }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, padding: "7px 11px", border: "none", background: "transparent", cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap", borderBottom: tab === t.id ? `2px solid ${d ? "#6fa8dc" : "#185FA5"}` : "2px solid transparent", color: tab === t.id ? (d ? "#6fa8dc" : "#185FA5") : text2, fontWeight: tab === t.id ? 500 : 400, transition: "color 0.15s" }}>
-            <i className={`ti ${t.icon}`} style={{ fontSize: 13 }} aria-hidden="true" />{t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Briefing ── */}
-      {tab === "briefing" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, animation: "fadeIn 0.2s ease" }}>
-          <p style={{ fontSize: 13, color: text2, margin: "0 0 4px" }}>Here's what matters today — across all your connected services.</p>
-          {briefingPoints.map((pt, i) => (
-            <div key={i} className="brow" style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", background: bg, border: `0.5px solid ${border}`, borderRadius: 10 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 8, background: pt.color + (d ? "30" : "18"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <i className={`ti ${pt.icon}`} style={{ fontSize: 15, color: pt.color }} aria-hidden="true" />
-              </div>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: text }}>{pt.text}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Priority Scoring ── */}
-      {tab === "priority" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, animation: "fadeIn 0.2s ease" }}>
-          <p style={{ fontSize: 13, color: text2, margin: "0 0 4px" }}>Items ranked by urgency, source, and action required — tackle the top ones first.</p>
-          {priorityItems.map((p, i) => (
-            <div key={i} style={{ background: bg, border: `0.5px solid ${border}`, borderRadius: 10, padding: "12px 14px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 11, marginBottom: 8 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: d ? p.dbg : p.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <i className={`ti ${p.icon}`} style={{ fontSize: 16, color: p.color }} aria-hidden="true" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: text }}>{p.title}</span>
-                    <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, fontWeight: 500, marginLeft: "auto", background: d ? p.dbg : p.bg, color: d ? p.dc : p.color, whiteSpace: "nowrap" }}>{p.label}</span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: 12, color: text2, lineHeight: 1.5 }}>{p.desc}</p>
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ScoreBar score={p.score} color={p.color} dark={d} />
-                <span style={{ fontSize: 11, fontWeight: 500, color: p.color, minWidth: 28, textAlign: "right" }}>{p.score}</span>
-                <span style={{ fontSize: 10, color: text3, whiteSpace: "nowrap" }}>{p.source}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Weekly Summary ── */}
-      {tab === "weekly" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, animation: "fadeIn 0.2s ease" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-            {[
-              { label: "Emails this week", value: weeklySummary.totalEmails, icon: "ti-mail", color: "#D85A30", abg: d ? "#4A1B0C" : "#FAECE7" },
-              { label: "Action needed", value: weeklySummary.actionNeeded, icon: "ti-alert-circle", color: "#E24B4A", abg: d ? "#501313" : "#FCEBEB" },
-              { label: "Slack messages", value: weeklySummary.slackMessages, icon: "ti-brand-slack", color: "#534AB7", abg: d ? "#26215C" : "#EEEDFE" },
-            ].map(({ label, value, icon, color, abg }) => (
-              <div key={label} style={{ background: bg2, borderRadius: 10, padding: "14px 16px", border: `0.5px solid ${border}`, textAlign: "center" }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: abg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>
-                  <i className={`ti ${icon}`} style={{ fontSize: 16, color }} aria-hidden="true" />
-                </div>
-                <p style={{ fontSize: 24, fontWeight: 500, margin: "0 0 4px", color: text }}>{value}</p>
-                <p style={{ fontSize: 11, color: text2, margin: 0 }}>{label}</p>
-              </div>
-            ))}
-          </div>
-          <div style={{ ...card }}>
-            <div style={{ padding: "12px 14px", borderBottom: `0.5px solid ${border}` }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: text }}>Week highlights</span>
-            </div>
-            {weeklySummary.highlights.map((h, i) => (
-              <div key={i} className="drow" style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", background: bg, borderBottom: i < weeklySummary.highlights.length - 1 ? `0.5px solid ${border}` : "none" }}>
-                <div style={{ width: 26, height: 26, borderRadius: 7, background: h.color + (d ? "30" : "18"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                  <i className={`ti ${h.icon}`} style={{ fontSize: 13, color: h.color }} aria-hidden="true" />
-                </div>
-                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: text }}>{h.text}</p>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: d ? "#042C53" : "#E6F1FB", border: `0.5px solid ${d ? "#1a5580" : "#b5d4f4"}`, borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <i className="ti ti-chart-bar" style={{ fontSize: 14, color: d ? "#6fa8dc" : "#185FA5" }} aria-hidden="true" />
-              <span style={{ fontSize: 13, fontWeight: 500, color: d ? "#6fa8dc" : "#185FA5" }}>Week summary</span>
-            </div>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: d ? "#b5d4f4" : "#0C447C" }}>
-              This is a light week — no meetings, low Slack activity, and manageable email volume. Two items need your action: the security alert and LinkedIn invitations. A good week to learn something new or get ahead on projects.
+            <h1 className="hero-title" style={{ fontSize:20, fontWeight:600, margin:0, letterSpacing:"-0.3px" }}>
+              {greeting}, Aadarsh 👋
+            </h1>
+            <p style={{ fontSize:13, color:text2, margin:"4px 0 0", display:"flex", alignItems:"center", gap:6 }}>
+              <i className="ti ti-calendar-event" style={{ fontSize:12 }} />
+              {dayName}, {dateStr}
             </p>
           </div>
-        </div>
-      )}
-
-      {/* ── Calendar ── */}
-      {tab === "calendar" && (
-        <div style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2.5rem", gap: 10, animation: "fadeIn 0.2s ease" }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: d ? "#042C53" : "#E6F1FB", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <i className="ti ti-calendar-off" style={{ fontSize: 26, color: "#378ADD" }} aria-hidden="true" />
+          <div style={{ display:"flex", gap:8 }} className="header-btns">
+            <button className="btn-hover" onClick={()=>setDark(!d)}
+              style={{ background:bg2, border:`1px solid ${border}`, borderRadius:22, padding:"6px 12px", cursor:"pointer", display:"flex", alignItems:"center", gap:5, color:text2, fontSize:13 }}>
+              <i className={`ti ${d?"ti-sun":"ti-moon"}`} style={{ fontSize:14 }} />
+              <span className="header-btn-text">{d?"Light":"Dark"}</span>
+            </button>
+            <button className="btn-hover" onClick={handleRefresh} disabled={refreshing||status!=="ready"}
+              style={{ background:accent, border:"none", borderRadius:22, padding:"6px 13px", cursor:"pointer", display:"flex", alignItems:"center", gap:6, color:"#fff", fontSize:13, opacity:refreshing?0.7:1 }}>
+              <i className={`ti ti-refresh ${refreshing?"spin":""}`} style={{ fontSize:14 }} />
+              <span className="header-btn-text">{refreshing?"Syncing…":"Refresh"}</span>
+            </button>
           </div>
-          <p style={{ fontSize: 15, fontWeight: 500, margin: 0, color: text }}>No events this week</p>
-          <p style={{ fontSize: 13, color: text2, margin: 0, textAlign: "center", maxWidth: 260 }}>Your calendar is completely clear — a good opportunity to plan ahead.</p>
         </div>
-      )}
 
-      {/* ── Gmail ── */}
-      {tab === "email" && (
-        <div style={{ ...card, animation: "fadeIn 0.2s ease" }}>
-          {emails.map((e, i) => (
-            <div key={i} className="drow" style={{ display: "flex", gap: 11, alignItems: "flex-start", padding: "11px 14px", background: bg, borderBottom: i < emails.length - 1 ? `0.5px solid ${border}` : "none" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: d ? e.dbg : e.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <i className="ti ti-mail" style={{ fontSize: 15, color: e.color }} aria-hidden="true" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: text }}>{e.from}</span>
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, fontWeight: 500, background: d ? tagMeta[e.tag].dbg : tagMeta[e.tag].bg, color: d ? tagMeta[e.tag].dc : tagMeta[e.tag].color }}>{e.tag}</span>
-                  <span style={{ fontSize: 11, color: text3, marginLeft: "auto" }}>{e.time}</span>
+        {/* ── Auth needed ─────────────────────────────────── */}
+        {status === "auth_needed" && (
+          <div className="anim-pop" style={{ ...card, padding:"2.5rem 1.5rem", textAlign:"center" }}>
+            <div style={{ width:60, height:60, borderRadius:18, background:"linear-gradient(135deg,#4285F4,#34A853)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+              <i className="ti ti-brand-google" style={{ fontSize:28, color:"#fff" }} />
+            </div>
+            <h2 style={{ fontSize:17, fontWeight:600, margin:"0 0 8px" }}>Connect Google Account</h2>
+            <p style={{ fontSize:13, color:text2, marginBottom:22, lineHeight:1.6 }}>Authorise Gmail & Calendar access — one time only.</p>
+            <a href={authUrl} target="_blank" rel="noreferrer"
+              style={{ background:"linear-gradient(135deg,#185FA5,#2476C3)", color:"#fff", padding:"11px 26px", borderRadius:22, fontSize:14, display:"inline-flex", alignItems:"center", gap:8, boxShadow:"0 4px 14px rgba(24,95,165,0.4)" }}>
+              <i className="ti ti-login" style={{ fontSize:16 }} /> Login with Google
+            </a>
+            <p style={{ fontSize:12, color:text3, marginTop:16 }}>After login, tap Refresh above.</p>
+          </div>
+        )}
+
+        {/* ── Loading skeletons ───────────────────────────── */}
+        {status === "loading" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <SkeletonBlock h={90} />
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+              <SkeletonBlock h={80} /><SkeletonBlock h={80} /><SkeletonBlock h={80} />
+            </div>
+            <SkeletonBlock h={56} /><SkeletonBlock h={56} /><SkeletonBlock h={56} />
+          </div>
+        )}
+
+        {/* ── Error ───────────────────────────────────────── */}
+        {status === "error" && (
+          <div className="anim-pop" style={{ ...card, padding:"2rem", textAlign:"center" }}>
+            <div style={{ width:52, height:52, borderRadius:16, background:"#FCEBEB", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
+              <i className="ti ti-wifi-off" style={{ fontSize:26, color:"#E24B4A" }} />
+            </div>
+            <p style={{ fontWeight:600, marginBottom:6 }}>Can't reach backend</p>
+            <p style={{ fontSize:13, color:text2, marginBottom:18, lineHeight:1.6 }}>
+              Make sure your server is running:<br/>
+              <code style={{ background:bg2, padding:"2px 7px", borderRadius:5, fontSize:12 }}>cd server &amp;&amp; npm run dev</code>
+            </p>
+            <button className="btn-hover" onClick={()=>loadData()}
+              style={{ background:accent, color:"#fff", border:"none", borderRadius:22, padding:"9px 22px", cursor:"pointer", fontSize:13 }}>
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* ── Main dashboard ──────────────────────────────── */}
+        {status === "ready" && (<>
+
+          {/* Weather */}
+          <div className="card-glow glass" style={{ background: d?"linear-gradient(135deg,#0d2d47,#0c3d60)":"linear-gradient(135deg,#daeeff,#c2dfff)", border:`1px solid ${d?"rgba(91,155,213,0.2)":"rgba(24,95,165,0.15)"}`, borderRadius:16, padding:"14px 16px", marginBottom:"1.1rem" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <i className={`ti ${weather.icon}`} style={{ fontSize:36, color: d?"#6fa8dc":"#185FA5", flexShrink:0 }} />
+                <div>
+                  <p style={{ fontSize:26, fontWeight:700, margin:0, color: d?"#e8e6df":"#042C53", letterSpacing:"-0.5px" }}>{weather.temp}°F</p>
+                  <p style={{ fontSize:12, color: d?"#6fa8dc":"#185FA5", margin:0, display:"flex", alignItems:"center", gap:4 }}>
+                    <i className="ti ti-map-pin" style={{ fontSize:11 }} /> Hyderabad · {weather.condition}
+                  </p>
                 </div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: text, marginBottom: 1 }}>{e.subject}</p>
-                <p style={{ margin: 0, fontSize: 12, color: text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.note}</p>
+              </div>
+              <div className="weather-week" style={{ display:"flex", gap:5 }}>
+                {weather.week.map((w,i)=>(
+                  <div key={i} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, background: d?"rgba(255,255,255,0.07)":"rgba(255,255,255,0.6)", borderRadius:10, padding:"5px 7px", minWidth:34 }}>
+                    <span style={{ fontSize:9, color:text2, fontWeight:600, textTransform:"uppercase" }}>{w.day}</span>
+                    <i className={`ti ${w.icon}`} style={{ fontSize:13, color: d?"#6fa8dc":"#185FA5" }} />
+                    <span style={{ fontSize:11, fontWeight:600, color:text }}>{w.high}°</span>
+                    <span style={{ fontSize:9, color: w.rain>=50?"#E24B4A":text3, fontWeight:500 }}>{w.rain}%</span>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            {weather.week.some(w=>w.rain>=50) && (
+              <p style={{ fontSize:11, color: d?"#6fa8dc":"#185FA5", marginTop:10, display:"flex", alignItems:"center", gap:5 }}>
+                <i className="ti ti-umbrella" style={{ fontSize:12 }} /> Rain expected Thu–Fri — carry an umbrella
+              </p>
+            )}
+          </div>
 
-      {/* ── Slack ── */}
-      {tab === "slack" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, animation: "fadeIn 0.2s ease" }}>
-          <div style={{ ...card }}>
-            {slackMessages.map((m, i) => (
-              <div key={i} className="drow" style={{ display: "flex", gap: 11, alignItems: "flex-start", padding: "12px 14px", background: bg }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%", background: d ? m.dbg : m.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <i className="ti ti-brand-slack" style={{ fontSize: 16, color: m.color }} aria-hidden="true" />
+          {/* Stat cards */}
+          <div className="stat-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1.1rem" }}>
+            {[
+              { icon:"ti-calendar",    label:"Events",  value:events.length||"0",  accent:"#378ADD", abg: d?"rgba(4,44,83,0.8)" :"#daeeff" },
+              { icon:"ti-mail",        label:"Unread",  value:emails.length||"0",  accent:"#D85A30", abg: d?"rgba(74,27,12,0.8)":"#FAECE7" },
+              { icon:"ti-brand-slack", label:"Slack",   value:slack.length||"0",   accent:"#534AB7", abg: d?"rgba(38,33,92,0.8)":"#EEEDFE" },
+            ].map(({icon,label,value,accent,abg})=>(
+              <div key={label} className="card-glow anim-pop" style={{ background:bgCard, borderRadius:14, padding:"13px 14px", border:`1px solid ${border}` }}>
+                <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:8 }}>
+                  <IconSquare icon={icon} color={accent} bg={abg} size={28} radius={8} />
+                  <span style={{ fontSize:11, color:text2, fontWeight:500 }}>{label}</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: text }}>{m.from} <span style={{ fontWeight: 400, color: text2, fontSize: 12 }}>in {m.channel}</span></span>
-                    <span style={{ fontSize: 11, color: text3 }}>{m.time}</span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: 13, color: text2 }}>{m.text}</p>
-                </div>
+                <p className="stat-value" style={{ fontSize:26, fontWeight:700, margin:0, letterSpacing:"-0.5px" }}>{value}</p>
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: d ? "#173404" : "#EAF3DE", borderRadius: 10, border: `0.5px solid ${border}` }}>
-            <i className="ti ti-check" style={{ fontSize: 14, color: "#3B6D11" }} aria-hidden="true" />
-            <p style={{ margin: 0, fontSize: 13, color: d ? "#97C459" : "#3B6D11" }}>All caught up — no unread mentions or DMs</p>
-          </div>
-        </div>
-      )}
 
-      {/* ── Footer ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem", paddingTop: "1rem", borderTop: `0.5px solid ${border}` }}>
-        <span style={{ fontSize: 11, color: text3, fontStyle: "italic" }}>Created by Itachi</span>
-        <span style={{ fontSize: 11, color: text3 }}>Last fetched: {lastRefresh} IST · Gmail · Calendar · Slack</span>
+          {/* Desktop tabs */}
+          <div className="desktop-tabs tabs-scroll" style={{ borderBottom:`1px solid ${border}`, marginBottom:"1.1rem", display:"flex", gap:0 }}>
+            {ALL_TABS.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)}
+                style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, padding:"8px 12px", border:"none", background:"transparent", cursor:"pointer", marginBottom:-1, whiteSpace:"nowrap",
+                  borderBottom: tab===t.id ? `2px solid ${accent}` : "2px solid transparent",
+                  color: tab===t.id ? accent : text2,
+                  fontWeight: tab===t.id ? 600 : 400,
+                  transition:"color 0.15s" }}>
+                <i className={`ti ${t.icon}`} style={{ fontSize:13 }} />{t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Tab content ────────────────────────────────── */}
+
+          {/* Briefing */}
+          {tab==="briefing" && (
+            <div className="anim-tab stagger" style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              <p style={{ fontSize:13, color:text2, marginBottom:4, display:"flex", alignItems:"center", gap:5 }}>
+                <i className="ti ti-sparkles" style={{ fontSize:13, color:accent }} /> Here's what matters today
+              </p>
+              {briefingPoints.map((pt,i)=>(
+                <div key={i} className="brow anim-fadeup" style={{ display:"flex", gap:12, alignItems:"flex-start", padding:"13px 14px", background:bgCard, border:`1px solid ${border}`, borderRadius:12 }}>
+                  <IconSquare icon={pt.icon} color={pt.color} bg={pt.color+"22"} size={32} radius={9} />
+                  <p style={{ margin:0, fontSize:14, lineHeight:1.7, color:text }}>{pt.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Priority */}
+          {tab==="priority" && (
+            <div className="anim-tab stagger" style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <p style={{ fontSize:13, color:text2, marginBottom:4, display:"flex", alignItems:"center", gap:5 }}>
+                <i className="ti ti-star" style={{ fontSize:13, color:accent }} /> Ranked by urgency — tackle top items first
+              </p>
+              {priorityItems.map((p,i)=>(
+                <div key={i} className="card-glow anim-fadeup" style={{ background:bgCard, border:`1px solid ${border}`, borderRadius:13, padding:"13px 14px" }}>
+                  <div style={{ display:"flex", gap:11, marginBottom:10 }}>
+                    <IconSquare icon={p.icon} color={p.color} bg={d?p.dbg:p.bg} size={34} radius={10} />
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+                        <span style={{ fontSize:13, fontWeight:600, color:text }}>{p.title}</span>
+                        <span className="tag-pill" style={{ marginLeft:"auto", background:d?p.dbg:p.bg, color:d?p.dc:p.color, flexShrink:0 }}>
+                          <i className={`ti ${tagMeta[p.label?.toLowerCase()]?.icon||"ti-circle"}`} style={{ fontSize:9 }} />
+                          {p.label}
+                        </span>
+                      </div>
+                      <p style={{ margin:0, fontSize:12, color:text2, lineHeight:1.55 }}>{p.desc}</p>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <ScoreBar score={p.score} color={p.color} dark={d} />
+                    <span style={{ fontSize:12, fontWeight:700, color:p.color, minWidth:26 }}>{p.score}</span>
+                    <span style={{ fontSize:10, color:text3, whiteSpace:"nowrap" }}>{p.source}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Weekly */}
+          {tab==="weekly" && (
+            <div className="anim-tab" style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+                {[
+                  { label:"Total emails",   value:emails.length,                              icon:"ti-mail",         color:"#D85A30", abg:d?"rgba(74,27,12,0.8)" :"#FAECE7" },
+                  { label:"Need action",    value:emails.filter(e=>e.tag!=="read").length,     icon:"ti-alert-circle", color:"#E24B4A", abg:d?"rgba(80,19,19,0.8)" :"#FCEBEB" },
+                  { label:"Slack msgs",     value:slack.length,                               icon:"ti-brand-slack",  color:"#534AB7", abg:d?"rgba(38,33,92,0.8)" :"#EEEDFE" },
+                ].map(({label,value,icon,color,abg})=>(
+                  <div key={label} style={{ background:bgCard, borderRadius:13, padding:"13px", border:`1px solid ${border}`, textAlign:"center" }}>
+                    <IconSquare icon={icon} color={color} bg={abg} size={32} radius={9} />
+                    <p style={{ fontSize:24, fontWeight:700, margin:"8px 0 3px", letterSpacing:"-0.5px" }}>{value}</p>
+                    <p style={{ fontSize:11, color:text2, margin:0 }}>{label}</p>
+                  </div>
+                ))}
+              </div>
+              <div style={{ ...card, borderRadius:14 }}>
+                <div style={{ padding:"11px 14px", borderBottom:`1px solid ${border}`, display:"flex", alignItems:"center", gap:7 }}>
+                  <i className="ti ti-list-check" style={{ fontSize:14, color:accent }} />
+                  <span style={{ fontSize:13, fontWeight:600 }}>Week highlights</span>
+                </div>
+                {briefingPoints.map((h,i)=>(
+                  <div key={i} className="drow" style={{ display:"flex", gap:10, padding:"11px 14px", background:bgCard, borderBottom: i<briefingPoints.length-1?`1px solid ${border}`:"none", alignItems:"flex-start" }}>
+                    <IconSquare icon={h.icon} color={h.color} bg={h.color+"22"} size={26} radius={7} />
+                    <p style={{ margin:0, fontSize:13, lineHeight:1.65, color:text }}>{h.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div style={{ background:d?"rgba(4,44,83,0.6)":"#daeeff", border:`1px solid ${d?"rgba(91,155,213,0.2)":"rgba(24,95,165,0.2)"}`, borderRadius:13, padding:"13px 15px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:6 }}>
+                  <i className="ti ti-chart-bar" style={{ fontSize:14, color:accent }} />
+                  <span style={{ fontSize:13, fontWeight:600, color:accent }}>Weekly summary</span>
+                </div>
+                <p style={{ margin:0, fontSize:13, lineHeight:1.7, color:d?"#b5d4f4":"#0C447C" }}>
+                  {emails.length} unread emails with {emails.filter(e=>e.tag!=="read").length} needing action.
+                  {events.length===0?" No meetings this week — ideal for focused work.":" Check your calendar for upcoming events."}
+                  {slack.length===0?" Slack is quiet." : ` ${slack.length} Slack message${slack.length>1?"s":""} to review.`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Calendar */}
+          {tab==="calendar" && (
+            events.length===0 ? (
+              <div className="anim-pop" style={{ ...card, borderRadius:14, display:"flex", flexDirection:"column", alignItems:"center", padding:"3rem 1.5rem", gap:12 }}>
+                <div style={{ width:56, height:56, borderRadius:16, background:d?"rgba(4,44,83,0.8)":"#daeeff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <i className="ti ti-calendar-off" style={{ fontSize:28, color:"#378ADD" }} />
+                </div>
+                <p style={{ fontSize:15, fontWeight:600, margin:0 }}>No events this week</p>
+                <p style={{ fontSize:13, color:text2, margin:0, textAlign:"center", lineHeight:1.6 }}>Your calendar is completely clear — a great opportunity to plan ahead.</p>
+              </div>
+            ) : (
+              <div className="anim-tab stagger" style={{ ...card, borderRadius:14 }}>
+                {events.map((e,i)=>(
+                  <div key={i} className="drow" style={{ display:"flex", gap:12, padding:"12px 14px", background:bgCard, borderBottom: i<events.length-1?`1px solid ${border}`:"none" }}>
+                    <IconCircle icon="ti-calendar-event" color="#378ADD" bg={d?"rgba(4,44,83,0.8)":"#daeeff"} size={38} />
+                    <div style={{ flex:1 }}>
+                      <p style={{ margin:0, fontSize:13, fontWeight:600, color:text }}>{e.title}</p>
+                      <p style={{ margin:"3px 0 0", fontSize:12, color:text2, display:"flex", alignItems:"center", gap:4 }}>
+                        <i className="ti ti-clock" style={{ fontSize:11 }} />{e.start}
+                        {e.location && <><i className="ti ti-map-pin" style={{ fontSize:11, marginLeft:6 }} />{e.location}</>}
+                      </p>
+                      {e.meetLink && (
+                        <a href={e.meetLink} target="_blank" rel="noreferrer"
+                          style={{ fontSize:11, color:"#378ADD", display:"inline-flex", alignItems:"center", gap:3, marginTop:4, fontWeight:500 }}>
+                          <i className="ti ti-video" style={{ fontSize:11 }} /> Join Meet
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* Gmail */}
+          {tab==="email" && (
+            <div className="anim-tab stagger" style={{ ...card, borderRadius:14 }}>
+              {emails.length===0 ? (
+                <div style={{ padding:"2.5rem", textAlign:"center" }}>
+                  <i className="ti ti-mail-check" style={{ fontSize:32, color:"#3B6D11" }} />
+                  <p style={{ margin:"10px 0 0", color:text2 }}>All caught up — inbox is clear 🎉</p>
+                </div>
+              ) : emails.map((e,i)=>(
+                <div key={i} className="drow" style={{ display:"flex", gap:12, padding:"12px 14px", background:bgCard, borderBottom: i<emails.length-1?`1px solid ${border}`:"none" }}>
+                  <IconCircle icon="ti-mail" color={e.color} bg={d?e.dbg:e.bg} size={38} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
+                      <span style={{ fontSize:13, fontWeight:600, color:text }}>{e.from}</span>
+                      <span className="tag-pill" style={{ background:d?tagMeta[e.tag]?.dbg:tagMeta[e.tag]?.bg, color:d?tagMeta[e.tag]?.dc:tagMeta[e.tag]?.color }}>
+                        <i className={`ti ${tagMeta[e.tag]?.icon}`} style={{ fontSize:9 }} />{e.tag}
+                      </span>
+                      <span style={{ fontSize:11, color:text3, marginLeft:"auto", whiteSpace:"nowrap" }}>{e.time}</span>
+                    </div>
+                    <p style={{ margin:0, fontSize:13, fontWeight:500, color:text, marginBottom:2 }}>{e.subject}</p>
+                    <p style={{ margin:0, fontSize:12, color:text2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{e.note}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Slack */}
+          {tab==="slack" && (
+            <div className="anim-tab" style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {slack.length===0 ? (
+                <div style={{ display:"flex", alignItems:"center", gap:10, padding:"14px 16px", background:d?"rgba(23,52,4,0.6)":"#EAF3DE", borderRadius:13, border:`1px solid ${border}` }}>
+                  <IconSquare icon="ti-circle-check" color="#3B6D11" bg={d?"rgba(59,109,17,0.25)":"rgba(59,109,17,0.12)"} size={30} radius={8} />
+                  <p style={{ margin:0, fontSize:13, color:d?"#97C459":"#3B6D11", fontWeight:500 }}>All caught up — no unread messages</p>
+                </div>
+              ) : (
+                <div className="stagger" style={{ ...card, borderRadius:14 }}>
+                  {slack.map((m,i)=>(
+                    <div key={i} className="drow anim-fadeup" style={{ display:"flex", gap:12, padding:"12px 14px", background:bgCard, borderBottom: i<slack.length-1?`1px solid ${border}`:"none" }}>
+                      <IconCircle icon="ti-brand-slack" color="#534AB7" bg={d?"rgba(38,33,92,0.8)":"#EEEDFE"} size={38} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                          <span style={{ fontSize:13, fontWeight:600, color:text }}>{m.from}
+                            <span style={{ fontWeight:400, color:text2, fontSize:12 }}> in {m.channel}</span>
+                          </span>
+                          <span style={{ fontSize:11, color:text3, whiteSpace:"nowrap" }}>{m.time}</span>
+                        </div>
+                        <p style={{ margin:0, fontSize:13, color:text2, lineHeight:1.5 }}>{m.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:"1.75rem", paddingTop:"1rem", borderTop:`1px solid ${border}` }}>
+            <span style={{ fontSize:11, color:text3, fontStyle:"italic", display:"flex", alignItems:"center", gap:4 }}>
+              <i className="ti ti-code" style={{ fontSize:11 }} /> Created by Itachi
+            </span>
+            <span style={{ fontSize:11, color:text3, display:"flex", alignItems:"center", gap:4 }}>
+              <i className="ti ti-refresh" style={{ fontSize:11 }} /> {lastFetch} IST
+            </span>
+          </div>
+
+        </>)}
       </div>
+
+      {/* ── Mobile bottom nav ─────────────────────────────── */}
+      <nav className="bottom-nav" style={{ background: d?"rgba(22,22,24,0.92)":"rgba(247,247,245,0.92)" }}>
+        {ALL_TABS.filter(t=>BOTTOM_TABS.includes(t.id)).map(t=>(
+          <button key={t.id} className="bottom-nav-btn" onClick={()=>setTab(t.id)}
+            style={{ color: tab===t.id ? accent : text3 }}>
+            <i className={`ti ${t.icon}`} style={{ fontSize:20 }} />
+            <span style={{ fontSize:10, fontWeight: tab===t.id?600:400 }}>{t.label}</span>
+            <div className="bottom-nav-dot" style={{ background:accent, opacity: tab===t.id?1:0, transform: tab===t.id?"scale(1)":"scale(0)" }} />
+          </button>
+        ))}
+        {/* More button for remaining tabs on mobile */}
+        <button className="bottom-nav-btn" onClick={()=>setTab("priority")}
+          style={{ color: ["priority","weekly"].includes(tab) ? accent : text3 }}>
+          <i className="ti ti-dots" style={{ fontSize:20 }} />
+          <span style={{ fontSize:10, fontWeight: ["priority","weekly"].includes(tab)?600:400 }}>More</span>
+          <div className="bottom-nav-dot" style={{ background:accent, opacity:["priority","weekly"].includes(tab)?1:0, transform:["priority","weekly"].includes(tab)?"scale(1)":"scale(0)" }} />
+        </button>
+      </nav>
+
     </div>
   );
 }

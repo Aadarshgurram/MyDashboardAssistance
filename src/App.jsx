@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const API = "http://localhost:3001";
-
+const API = "https://mydashboardassistance.onrender.com";
 const today = new Date();
 const dayName  = today.toLocaleDateString("en-IN", { weekday: "long" });
 const dateStr  = today.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });

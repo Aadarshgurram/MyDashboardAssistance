@@ -15,7 +15,12 @@ app.use(express.json());
 
 // Cache to avoid hammering APIs on every frontend refresh
 let cache = { emails: [], events: [], slack: [], lastUpdated: null };
-
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Dashboard Backend Running"
+  });
+});
 // ── Auth Routes ──────────────────────────────────────────────
 // Step 1: Visit this in browser to login with Google
 app.get("/auth/google", (req, res) => {

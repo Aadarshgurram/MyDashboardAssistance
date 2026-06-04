@@ -10,34 +10,55 @@ const { fetchSlackMessages } = require("./slack");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173", credentials: true }));
+// ── CORS — allow Vercel frontend + localhost ──────────────
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:4173",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow requests with no origin (mobile apps, curl, Render health checks)
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow any vercel.app subdomain
+    if (origin.endsWith(".vercel.app")) return cb(null, true);
+    cb(new Error("CORS: " + origin + " not allowed"));
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 
-// Cache to avoid hammering APIs on every frontend refresh
+// Cache
 let cache = { emails: [], events: [], slack: [], lastUpdated: null };
+
+// ── Health check ──────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Dashboard Backend Running"
-  });
-});
-// ── Auth Routes ──────────────────────────────────────────────
-// Step 1: Visit this in browser to login with Google
-app.get("/auth/google", (req, res) => {
-  const url = getAuthUrl();
-  res.redirect(url);
+  res.json({ success: true, message: "Dashboard Backend Running ✅", time: new Date().toISOString() });
 });
 
-// Step 2: Google redirects here with code
+// ── Auth Routes ───────────────────────────────────────────
+app.get("/auth/google", (req, res) => {
+  res.redirect(getAuthUrl());
+});
+
 app.get("/auth/google/callback", async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).send("No code received");
   try {
     await getTokenFromCode(code);
     res.send(`
-      <html><body style="font-family:sans-serif;padding:2rem;background:#1a1a1a;color:#e8e6e0">
-        <h2>✅ Google Auth Successful!</h2>
-        <p>You can close this tab and go back to your dashboard.</p>
+      <html>
+      <head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+      <body style="font-family:sans-serif;padding:2rem;background:#161618;color:#e8e6df;text-align:center">
+        <div style="font-size:48px;margin-bottom:16px">✅</div>
+        <h2 style="margin:0 0 8px">Google Auth Successful!</h2>
+        <p style="color:#8a8884;margin:0 0 20px">Your token has been saved.</p>
+        <p style="color:#8a8884;font-size:13px">⚠️ Check your server terminal/logs and copy the<br>
+        <strong style="color:#5b9bd5">GOOGLE_TOKEN</strong> value into your Render environment variables.</p>
+        <p style="color:#8a8884;font-size:13px;margin-top:16px">You can close this tab now.</p>
       </body></html>
     `);
   } catch (err) {
@@ -45,70 +66,50 @@ app.get("/auth/google/callback", async (req, res) => {
   }
 });
 
-// Check if authenticated
 app.get("/auth/status", (req, res) => {
-  const authenticated = loadToken();
-  res.json({ authenticated });
+  res.json({ authenticated: loadToken() });
 });
 
-// ── Data Routes ──────────────────────────────────────────────
+// ── Data Routes ───────────────────────────────────────────
 async function refreshAllData() {
-  console.log("🔄 Refreshing all data...", new Date().toLocaleTimeString());
+  console.log("🔄 Refreshing...", new Date().toISOString());
   const [emails, events, slack] = await Promise.all([
     fetchEmails(),
     fetchCalendarEvents(),
     fetchSlackMessages(),
   ]);
   cache = { emails, events, slack, lastUpdated: new Date().toISOString() };
-  console.log(`✅ Done — ${emails.length} emails, ${events.length} events, ${slack.length} slack msgs`);
+  console.log(`✅ ${emails.length} emails, ${events.length} events, ${slack.length} slack`);
   return cache;
 }
 
-// Get all dashboard data
 app.get("/api/dashboard", async (req, res) => {
   const isAuth = loadToken();
   if (!isAuth) return res.status(401).json({ error: "not_authenticated", authUrl: getAuthUrl() });
-
   try {
-    // If cache is older than 15 mins, refresh
-    const cacheAge = cache.lastUpdated ? (Date.now() - new Date(cache.lastUpdated)) / 60000 : 999;
-    if (cacheAge > 15 || req.query.force === "true") await refreshAllData();
+    const age = cache.lastUpdated ? (Date.now() - new Date(cache.lastUpdated)) / 60000 : 999;
+    if (age > 15 || req.query.force === "true") await refreshAllData();
     res.json({ success: true, data: cache });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Force refresh
 app.post("/api/refresh", async (req, res) => {
-  const isAuth = loadToken();
-  if (!isAuth) return res.status(401).json({ error: "not_authenticated" });
+  if (!loadToken()) return res.status(401).json({ error: "not_authenticated" });
   try {
-    const data = await refreshAllData();
-    res.json({ success: true, data });
+    res.json({ success: true, data: await refreshAllData() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── Cron: Auto refresh every 30 mins ────────────────────────
-cron.schedule("*/30 * * * *", () => {
-  if (loadToken()) refreshAllData();
-});
+// ── Cron jobs ─────────────────────────────────────────────
+cron.schedule("*/30 * * * *", () => { if (loadToken()) refreshAllData(); });
+cron.schedule("30 0 * * *",   () => { if (loadToken()) { console.log("🌅 6AM IST briefing"); refreshAllData(); } });
 
-// ── Cron: Morning briefing at 6:00 AM IST ───────────────────
-// IST = UTC+5:30, so 6AM IST = 0:30 UTC
-cron.schedule("30 0 * * *", () => {
-  if (loadToken()) {
-    console.log("🌅 6:00 AM morning briefing refresh triggered");
-    refreshAllData();
-  }
-});
-
-// ── Start Server ─────────────────────────────────────────────
+// ── Start ─────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🚀 Dashboard backend running at http://localhost:${PORT}`);
-  console.log(`\n👉 First time? Open this in your browser to login with Google:`);
-  console.log(`   http://localhost:${PORT}/auth/google\n`);
-  loadToken(); // Try loading existing token on startup
+  console.log(`\n🚀 Backend running on port ${PORT}`);
+  loadToken();
 });

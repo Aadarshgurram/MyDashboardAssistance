@@ -15,23 +15,42 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
 ];
 
-// Load saved token if exists
+// Load token — from env var (Render) OR file (local)
 function loadToken() {
-  if (fs.existsSync(TOKEN_PATH)) {
-    const token = JSON.parse(fs.readFileSync(TOKEN_PATH));
-    oauth2Client.setCredentials(token);
-    return true;
+  try {
+    // First try env var (works on Render)
+    if (process.env.GOOGLE_TOKEN) {
+      const token = JSON.parse(process.env.GOOGLE_TOKEN);
+      oauth2Client.setCredentials(token);
+      return true;
+    }
+    // Fallback to file (works locally)
+    if (fs.existsSync(TOKEN_PATH)) {
+      const token = JSON.parse(fs.readFileSync(TOKEN_PATH));
+      oauth2Client.setCredentials(token);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("loadToken error:", e.message);
+    return false;
   }
-  return false;
 }
 
-// Save token to file
+// Save token — to file locally AND log for Render
 function saveToken(token) {
-  fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+  try {
+    fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+  } catch (e) {
+    // On Render, file system may be read-only — that's ok
+  }
   oauth2Client.setCredentials(token);
+  // Print token so you can copy it into Render env vars
+  console.log("\n=== COPY THIS TOKEN INTO RENDER ENV VARS ===");
+  console.log("GOOGLE_TOKEN=" + JSON.stringify(token));
+  console.log("=============================================\n");
 }
 
-// Generate auth URL for first-time login
 function getAuthUrl() {
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
@@ -40,14 +59,12 @@ function getAuthUrl() {
   });
 }
 
-// Exchange code for token
 async function getTokenFromCode(code) {
   const { tokens } = await oauth2Client.getToken(code);
   saveToken(tokens);
   return tokens;
 }
 
-// Auto refresh token when expired
 oauth2Client.on("tokens", (tokens) => {
   if (tokens.refresh_token) saveToken(tokens);
 });

@@ -150,6 +150,12 @@ export default function App() {
   }, []);
 
   const { emails, events, slack } = data;
+
+  const openGmailReply = (e) => {
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.email || "")}&su=${encodeURIComponent("Re: " + e.subject)}&body=${encodeURIComponent(e.draftReply || "")}`;
+    window.open(url, "_blank");
+  };
+
   const briefingPoints = getBriefing(emails, events, slack);
   const priorityItems  = getPriorityItems(emails, slack);
   const lastFetch = data.lastUpdated
@@ -452,19 +458,35 @@ export default function App() {
                     <p style={{ margin:"12px 0 0", color:text2, fontSize:14 }}>All caught up — inbox is clear 🎉</p>
                   </div>
                 : emails.map((e,i)=>(
-                    <div key={i} className="drow" style={{ display:"flex", gap:12, padding:"13px 14px", background:bgCard, borderBottom:i<emails.length-1?`1px solid ${border}`:"none" }}>
-                      <IconCircle icon="ti-mail" color={e.color} bg={d?e.dbg:e.bg} size={40} />
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
-                          <span style={{ fontSize:13, fontWeight:600, color:text }}>{e.from}</span>
-                          <span className="tag-pill" style={{ background:d?tagMeta[e.tag]?.dbg:tagMeta[e.tag]?.bg, color:d?tagMeta[e.tag]?.dc:tagMeta[e.tag]?.color }}>
-                            <i className={`ti ${tagMeta[e.tag]?.icon}`} style={{ fontSize:9 }} />{e.tag}
-                          </span>
-                          <span style={{ fontSize:11, color:text3, marginLeft:"auto", whiteSpace:"nowrap" }}>{e.time}</span>
+                    <div key={i} className="drow" style={{ display:"flex", flexDirection:"column", gap:8, padding:"13px 14px", background:bgCard, borderBottom:i<emails.length-1?`1px solid ${border}`:"none" }}>
+                      <div style={{ display:"flex", gap:12 }}>
+                        <IconCircle icon="ti-mail" color={e.color} bg={d?e.dbg:e.bg} size={40} />
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
+                            <span style={{ fontSize:13, fontWeight:600, color:text }}>{e.from}</span>
+                            <span className="tag-pill" style={{ background:d?tagMeta[e.tag]?.dbg:tagMeta[e.tag]?.bg, color:d?tagMeta[e.tag]?.dc:tagMeta[e.tag]?.color }}>
+                              <i className={`ti ${tagMeta[e.tag]?.icon}`} style={{ fontSize:9 }} />{e.tag}
+                            </span>
+                            <span style={{ fontSize:11, color:text3, marginLeft:"auto", whiteSpace:"nowrap" }}>{e.time}</span>
+                          </div>
+                          <p style={{ margin:0, fontSize:13, fontWeight:500, color:text, marginBottom:2 }}>{e.subject}</p>
+                          <p style={{ margin:0, fontSize:12, color:text2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{e.note}</p>
                         </div>
-                        <p style={{ margin:0, fontSize:13, fontWeight:500, color:text, marginBottom:2 }}>{e.subject}</p>
-                        <p style={{ margin:0, fontSize:12, color:text2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{e.note}</p>
                       </div>
+                      {(e.tag==="action" || e.tag==="alert") && e.draftReply && (
+                        <div style={{ marginLeft:52, background:d?"rgba(255,255,255,0.04)":"#F7F6F2", border:`1px solid ${border}`, borderRadius:10, padding:"10px 12px" }}>
+                          <p style={{ margin:"0 0 6px", fontSize:10, fontWeight:700, color:text3, textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                            <i className="ti ti-sparkles" style={{ fontSize:11, marginRight:4 }} />AI Draft Reply
+                          </p>
+                          <p style={{ margin:"0 0 10px", fontSize:12, color:text2, lineHeight:1.5, whiteSpace:"pre-wrap" }}>{e.draftReply}</p>
+                          <button
+                            onClick={() => openGmailReply(e)}
+                            style={{ display:"inline-flex", alignItems:"center", gap:6, background:accent, color:"#fff", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}
+                          >
+                            <i className="ti ti-send" style={{ fontSize:13 }} /> Send Reply
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
               }

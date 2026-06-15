@@ -1,5 +1,6 @@
 const { google } = require("googleapis");
 const { oauth2Client } = require("./auth");
+const { generateEmailReply } = require("./ai");
 
 const tagMap = {
   "notifications@vercel.com": "alert",
@@ -41,6 +42,12 @@ function timeAgo(dateStr) {
   return date.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
 }
 
+// Extract just the email address from a "Name <email@x.com>" header
+function extractEmailAddress(fromHeader) {
+  const match = fromHeader.match(/<(.+)>/);
+  return match ? match[1] : fromHeader.trim();
+}
+
 async function fetchEmails() {
   try {
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
@@ -65,21 +72,37 @@ async function fetchEmails() {
 
         const headers = msg.data.payload.headers;
         const get = (name) => headers.find((h) => h.name === name)?.value || "";
-        const from = get("From").replace(/<.*>/, "").trim().replace(/"/g, "");
-        const sender = get("From");
+        const fromHeader = get("From");
+        const from = fromHeader.replace(/<.*>/, "").trim().replace(/"/g, "");
+        const email = extractEmailAddress(fromHeader);
         const subject = get("Subject");
         const date = get("Date");
         const snippet = msg.data.snippet?.replace(/&#39;/g, "'").replace(/&amp;/g, "&") || "";
-        const tag = getTag(sender);
+        const tag = getTag(fromHeader);
         const { color, bg, dbg } = getColor(tag);
+
+        let draftReply = null;
+        if (tag === "action" || tag === "alert") {
+          try {
+            draftReply = await generateEmailReply({
+              from: from || email,
+              subject: subject || "(no subject)",
+              note: snippet,
+            });
+          } catch (e) {
+            console.error(`Draft reply failed for "${subject}":`, e.message);
+          }
+        }
 
         return {
           from: from || "Unknown",
+          email,
           color, bg, dbg,
           subject: subject || "(no subject)",
           note: snippet.slice(0, 90),
           tag,
           time: timeAgo(date),
+          draftReply,
         };
       })
     );

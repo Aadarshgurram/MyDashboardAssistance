@@ -84,6 +84,7 @@ export default function App() {
   const [authUrl,    setAuthUrl]    = useState("");
   const [waking,     setWaking]     = useState(false);
   const [weather,    setWeather]    = useState(null);
+  const [pushStatus, setPushStatus] = useState("idle"); // idle | subscribed | denied | unsupported
 
   const d      = dark;
   const bg     = d ? "#161618" : "#f7f7f5";
@@ -128,6 +129,62 @@ export default function App() {
     } catch { setStatus("error"); }
     finally { setRefreshing(false); }
   };
+
+  // ── Push notification helpers ──────────────────────────
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  const subscribeToPush = useCallback(async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushStatus("unsupported");
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus("denied");
+        return;
+      }
+
+      const keyRes = await fetch(`${API}/api/push/vapid-public-key`);
+      const { publicKey } = await keyRes.json();
+      if (!publicKey) { setPushStatus("unsupported"); return; }
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      await fetch(`${API}/api/push/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
+
+      setPushStatus("subscribed");
+    } catch (err) {
+      console.error("Push subscription error:", err);
+      setPushStatus("denied");
+    }
+  }, []);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator && "PushManager" in window && Notification.permission === "granted") {
+      subscribeToPush();
+    }
+  }, [subscribeToPush]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -177,6 +234,13 @@ export default function App() {
           </div>
         </div>
         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          {/* Push notification toggle — bigger on mobile */}
+          {pushStatus !== "unsupported" && (
+            <button onClick={subscribeToPush} title={pushStatus==="subscribed"?"Notifications on":"Enable 6AM notifications"}
+              style={{ width:40, height:40, borderRadius:12, background:pushStatus==="subscribed"?(d?"rgba(59,109,17,0.25)":"#EAF3DE"):bg2, border:`1px solid ${border}`, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:pushStatus==="subscribed"?"#3B6D11":text2 }}>
+              <i className={`ti ${pushStatus==="subscribed"?"ti-bell-ringing":"ti-bell"}`} style={{ fontSize:18 }} />
+            </button>
+          )}
           {/* Dark mode toggle — bigger on mobile */}
           <button onClick={()=>setDark(!d)} style={{ width:40, height:40, borderRadius:12, background:bg2, border:`1px solid ${border}`, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:text2 }}>
             <i className={`ti ${d?"ti-sun":"ti-moon"}`} style={{ fontSize:18 }} />
@@ -200,6 +264,13 @@ export default function App() {
             </p>
           </div>
           <div style={{ display:"flex", gap:8 }}>
+            {pushStatus !== "unsupported" && (
+              <button className="btn-hover" onClick={subscribeToPush}
+                style={{ background:pushStatus==="subscribed"?(d?"rgba(59,109,17,0.25)":"#EAF3DE"):bg2, border:`1px solid ${border}`, borderRadius:22, padding:"7px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:6, color:pushStatus==="subscribed"?"#3B6D11":text2, fontSize:13 }}>
+                <i className={`ti ${pushStatus==="subscribed"?"ti-bell-ringing":"ti-bell"}`} style={{ fontSize:15 }} />
+                {pushStatus==="subscribed"?"Notifications on":"Enable notifications"}
+              </button>
+            )}
             <button className="btn-hover" onClick={()=>setDark(!d)}
               style={{ background:bg2, border:`1px solid ${border}`, borderRadius:22, padding:"7px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:6, color:text2, fontSize:13 }}>
               <i className={`ti ${d?"ti-sun":"ti-moon"}`} style={{ fontSize:15 }} />{d?"Light":"Dark"}

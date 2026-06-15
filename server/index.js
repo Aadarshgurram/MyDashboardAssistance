@@ -107,8 +107,19 @@ app.post("/api/refresh", async (req, res) => {
 
 // ── Cron jobs ─────────────────────────────────────────────
 cron.schedule("*/30 * * * *", () => { if (loadToken()) refreshAllData(); });
-cron.schedule("30 0 * * *",   () => { if (loadToken()) { console.log("🌅 6AM IST briefing"); refreshAllData(); } });
-
+cron.schedule("30 0 * * *", async () => {
+  if (!loadToken()) return;
+  console.log("🌅 6AM IST briefing");
+  const data = await refreshAllData();
+  const emailCount = data.emails.length;
+  const eventCount = data.events.length;
+  await sendNotificationToAll({
+    title: "Good morning! ☀️",
+    body: `${emailCount} email${emailCount!==1?"s":""}, ${eventCount} event${eventCount!==1?"s":""} today`,
+    icon: "/icon-192.png",
+    url: process.env.FRONTEND_URL || "https://my-dashboard-assistance.vercel.app",
+  });
+});
 // ── Start ─────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 Backend running on port ${PORT}`);
@@ -128,6 +139,31 @@ app.get("/api/weather", async (req, res) => {
     );
     if (!weather) return res.status(500).json({ error: "weather_fetch_failed" });
     res.json({ success: true, data: weather });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const { addSubscription, removeSubscription, sendNotificationToAll } = require("./push");
+
+// ── Push subscription routes ──────────────────────────────
+app.get("/api/push/vapid-public-key", (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+app.post("/api/push/subscribe", (req, res) => {
+  try {
+    addSubscription(req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/push/unsubscribe", (req, res) => {
+  try {
+    removeSubscription(req.body.endpoint);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

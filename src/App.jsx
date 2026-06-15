@@ -6,17 +6,6 @@ const dayName  = today.toLocaleDateString("en-IN", { weekday: "long" });
 const dateStr  = today.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 const greeting = today.getHours() < 12 ? "Good morning" : today.getHours() < 17 ? "Good afternoon" : "Good evening";
 
-const weather = {
-  temp: 94, condition: "Partly Sunny", icon: "ti-cloud-sun",
-  week: [
-    { day: "Wed", high: 96, rain: 15, icon: "ti-cloud-sun"    },
-    { day: "Thu", high: 96, rain: 50, icon: "ti-cloud-rain"   },
-    { day: "Fri", high: 94, rain: 65, icon: "ti-cloud-rain"   },
-    { day: "Sat", high: 94, rain: 35, icon: "ti-cloud-drizzle"},
-    { day: "Sun", high: 94, rain: 35, icon: "ti-cloud-drizzle"},
-  ]
-};
-
 const tagMeta = {
   alert:  { bg:"#FCEBEB", color:"#A32D2D", dbg:"#501313", dc:"#F09595", icon:"ti-alert-circle"      },
   action: { bg:"#FAEEDA", color:"#854F0B", dbg:"#412402", dc:"#FAC775", icon:"ti-circle-arrow-right" },
@@ -94,6 +83,7 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [authUrl,    setAuthUrl]    = useState("");
   const [waking,     setWaking]     = useState(false);
+  const [weather,    setWeather]    = useState(null);
 
   const d      = dark;
   const bg     = d ? "#161618" : "#f7f7f5";
@@ -140,6 +130,24 @@ export default function App() {
   };
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    const getWeather = (lat, lon) => {
+      fetch(`${API}/api/weather?lat=${lat}&lon=${lon}`)
+        .then(res => res.json())
+        .then(json => { if (json.success) setWeather(json.data); })
+        .catch(() => {});
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => getWeather(pos.coords.latitude, pos.coords.longitude),
+        () => getWeather(17.385, 78.4867) // fallback: Hyderabad
+      );
+    } else {
+      getWeather(17.385, 78.4867);
+    }
+  }, []);
 
   const { emails, events, slack } = data;
   const briefingPoints = getBriefing(emails, events, slack);
@@ -262,34 +270,38 @@ export default function App() {
         {status === "ready" && (<>
 
           {/* Weather */}
+          {weather && (
           <div style={{ background:d?"linear-gradient(135deg,#0d2d47,#0c3d60)":"linear-gradient(135deg,#daeeff,#c2dfff)", border:`1px solid ${d?"rgba(91,155,213,0.2)":"rgba(24,95,165,0.15)"}`, borderRadius:16, padding:"14px 16px", marginBottom:"1rem" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
               <div style={{ display:"flex", alignItems:"center", gap:12 }}>
                 <i className={`ti ${weather.icon}`} style={{ fontSize:38, color:d?"#6fa8dc":"#185FA5", flexShrink:0 }} />
                 <div>
-                  <p style={{ fontSize:28, fontWeight:700, margin:0, color:d?"#e8e6df":"#042C53", letterSpacing:"-0.5px" }}>{weather.temp}°F</p>
+                  <p style={{ fontSize:28, fontWeight:700, margin:0, color:d?"#e8e6df":"#042C53", letterSpacing:"-0.5px" }}>{weather.temp}°C</p>
                   <p style={{ fontSize:12, color:d?"#6fa8dc":"#185FA5", margin:0 }}>
-                    <i className="ti ti-map-pin" style={{ fontSize:11 }} /> Hyderabad · {weather.condition}
+                    <i className="ti ti-map-pin" style={{ fontSize:11 }} /> {weather.city} · {weather.condition}
                   </p>
                 </div>
               </div>
-              <div className="weather-week" style={{ display:"flex", gap:4 }}>
-                {weather.week.map((w,i)=>(
-                  <div key={i} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, background:d?"rgba(255,255,255,0.07)":"rgba(255,255,255,0.6)", borderRadius:10, padding:"5px 6px", minWidth:32 }}>
-                    <span style={{ fontSize:9, color:text2, fontWeight:600 }}>{w.day}</span>
-                    <i className={`ti ${w.icon}`} style={{ fontSize:12, color:d?"#6fa8dc":"#185FA5" }} />
-                    <span style={{ fontSize:10, fontWeight:600, color:text }}>{w.high}°</span>
-                    <span style={{ fontSize:9, color:w.rain>=50?"#E24B4A":text3 }}>{w.rain}%</span>
-                  </div>
-                ))}
-              </div>
+              {weather.week?.length > 0 && (
+                <div className="weather-week" style={{ display:"flex", gap:4 }}>
+                  {weather.week.map((w,i)=>(
+                    <div key={i} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, background:d?"rgba(255,255,255,0.07)":"rgba(255,255,255,0.6)", borderRadius:10, padding:"5px 6px", minWidth:32 }}>
+                      <span style={{ fontSize:9, color:text2, fontWeight:600 }}>{w.day}</span>
+                      <i className={`ti ${w.icon}`} style={{ fontSize:12, color:d?"#6fa8dc":"#185FA5" }} />
+                      <span style={{ fontSize:10, fontWeight:600, color:text }}>{w.high}°</span>
+                      <span style={{ fontSize:9, color:w.rain>=50?"#E24B4A":text3 }}>{w.rain}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            {weather.week.some(w=>w.rain>=50) && (
+            {weather.week?.some(w=>w.rain>=50) && (
               <p style={{ fontSize:11, color:d?"#6fa8dc":"#185FA5", marginTop:10 }}>
-                <i className="ti ti-umbrella" style={{ fontSize:11 }} /> Rain expected Thu–Fri — carry an umbrella
+                <i className="ti ti-umbrella" style={{ fontSize:11 }} /> Rain expected — carry an umbrella
               </p>
             )}
           </div>
+          )}
 
           {/* Stats */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:"1rem" }}>

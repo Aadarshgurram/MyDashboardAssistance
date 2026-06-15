@@ -1,6 +1,7 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const express = require("express");
 const cors = require("cors");
+const { fetchWeather } = require("./weather");
 const cron = require("node-cron");
 const { oauth2Client, loadToken, getAuthUrl, getTokenFromCode } = require("./auth");
 const { fetchEmails } = require("./gmail");
@@ -32,8 +33,7 @@ app.use(cors({
 app.use(express.json());
 
 // Cache
-let cache = { emails: [], events: [], slack: [], lastUpdated: null };
-
+let cache = { emails: [], events: [], slack: [], weather: null, lastUpdated: null };
 // ── Health check ──────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({ success: true, message: "Dashboard Backend Running ✅", time: new Date().toISOString() });
@@ -73,13 +73,14 @@ app.get("/auth/status", (req, res) => {
 // ── Data Routes ───────────────────────────────────────────
 async function refreshAllData() {
   console.log("🔄 Refreshing...", new Date().toISOString());
-  const [emails, events, slack] = await Promise.all([
+  const [emails, events, slack, weather] = await Promise.all([
     fetchEmails(),
     fetchCalendarEvents(),
     fetchSlackMessages(),
+    fetchWeather(),
   ]);
-  cache = { emails, events, slack, lastUpdated: new Date().toISOString() };
-  console.log(`✅ ${emails.length} emails, ${events.length} events, ${slack.length} slack`);
+  cache = { emails, events, slack, weather, lastUpdated: new Date().toISOString() };
+  console.log(`✅ ${emails.length} emails, ${events.length} events, ${slack.length} slack, weather: ${weather ? weather.temp + "°C" : "n/a"}`);
   return cache;
 }
 
@@ -112,4 +113,22 @@ cron.schedule("30 0 * * *",   () => { if (loadToken()) { console.log("🌅 6AM I
 app.listen(PORT, () => {
   console.log(`\n🚀 Backend running on port ${PORT}`);
   loadToken();
+});
+
+// const { fetchWeather } = require("./weather");
+
+// ── Weather Route (separate, location-aware) ──────────────
+app.get("/api/weather", async (req, res) => {
+  try {
+    const lat = parseFloat(req.query.lat);
+    const lon = parseFloat(req.query.lon);
+    const weather = await fetchWeather(
+      isNaN(lat) ? undefined : lat,
+      isNaN(lon) ? undefined : lon
+    );
+    if (!weather) return res.status(500).json({ error: "weather_fetch_failed" });
+    res.json({ success: true, data: weather });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
